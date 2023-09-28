@@ -16,18 +16,20 @@ RUN flutter channel master && \
     flutter upgrade && \
     flutter config --enable-web
 
+# Clonage du dépôt rustdesk et changement de branche
+RUN git clone https://github.com/JelleBuning/rustdesk.git /app/rustdesk
+WORKDIR /app/rustdesk
+RUN git switch fix_build
+WORKDIR /app/rustdesk/flutter/web/js
+
 # Installation des dépendances Node.js
-RUN npm install ts-proto && \
-    npm install vite@2.8 && \
+RUN npm install ts-proto vite@2.8 && \
     npm install -g yarn typescript protoc
 
-# Copie du code source et construction de l'application
-COPY . /app
-WORKDIR /app/flutter/web/js
+# Construction du projet
 RUN yarn build
-WORKDIR /app
+WORKDIR /app/rustdesk
 RUN flutter build web
-
 
 # --- Étape 2 : Configuration du serveur ---
 
@@ -40,7 +42,7 @@ RUN apt-get update && \
     apt-get clean
 
 # Copie des fichiers nécessaires depuis l'étape de build
-COPY --from=build /app/build/web /app/build/web
+COPY --from=build /app/rustdesk/build/web /app/build/web
 COPY server/server.sh /app/server/
 
 # Exposition du port et exécution du script de démarrage
