@@ -6,6 +6,7 @@ FROM ubuntu:20.04 AS build
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -y curl git wget unzip libgconf-2-4 libstdc++6 libglu1-mesa clang cmake ninja-build pkg-config libgtk-3-dev npm python3 && \
+    ln -s /usr/bin/python3 /usr/bin/python && \
     apt-get clean
 
 # Installation de Flutter
