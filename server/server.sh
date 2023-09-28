@@ -8,7 +8,7 @@ echo 'preparing port' $PORT '...'
 fuser -k 5000/tcp
 
 # Switch directory
-cd build/web/
+cd /app/build/web/
 
 # Start the server
 echo 'Server starting on port' $PORT '...'
