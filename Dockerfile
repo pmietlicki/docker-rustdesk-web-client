@@ -17,6 +17,7 @@ RUN flutter config --enable-web
 
 # Clonage du dépôt rustdesk et changement de branche
 RUN git clone https://github.com/JelleBuning/rustdesk_web.git /app/rustdesk
+WORKDIR /app/rustdesk
 RUN git switch fix_build
 WORKDIR /app/rustdesk/flutter/web/js
 
