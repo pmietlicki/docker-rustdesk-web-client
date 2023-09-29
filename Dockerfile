@@ -53,7 +53,7 @@ RUN apt-get update && \
     apt-get clean
 
 # Copy necessary files from the build stage
-COPY --from=build /app/rustdesk/build/web /app/build/web
+COPY --from=build /app/rustdesk/flutter/build/web /app/build/web
 COPY server/server.sh /app/server/
 
 # Expose the port and run the startup script
