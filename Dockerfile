@@ -49,7 +49,7 @@ FROM ubuntu:20.04 AS runtime
 # Install Python3
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
-    apt-get install -y python3 && \
+    apt-get install -y python3 psmisc && \
     apt-get clean
 
 # Copy necessary files from the build stage
