@@ -28,8 +28,11 @@ RUN apt-get install -y nodejs
 RUN npm install -g npm@9.8.1
 
 # Install Node.js dependencies
-RUN npm install -g yarn typescript protoc --force
-RUN npm install ts-proto vite@2.8 yarn typescript protoc --force
+RUN npm install -g yarn protoc --force
+# Update TypeScript to match newer @types/node definitions
+RUN npm install ts-proto vite@2.8 yarn typescript@5.8.3 protoc --force
+# Relax type checking of bundled libraries
+RUN sed -i '/"noImplicitReturns": true/a\    "skipLibCheck": true' tsconfig.json
 
 RUN yarn build
 
