@@ -44,6 +44,9 @@ RUN tar xzf web_deps.tar.gz
 WORKDIR /app/rustdesk/flutter
 RUN flutter build web --release
 
+# → on force ws:// → wss:// dans le JS compilé
+RUN sed -i 's|ws://|wss://|g' /app/rustdesk/flutter/build/web/main.dart.js
+
 
 # --- Step 2: Server Configuration ---
 
