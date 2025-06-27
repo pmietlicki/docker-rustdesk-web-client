@@ -8,7 +8,7 @@ FROM node:20-slim AS js-build
 # ————— paramètres build ——————————————
 ARG RUSTDESK_REPO=rustdesk/rustdesk
 ARG RUSTDESK_TAG=1.4.0
-ARG ENABLE_WSS=true
+ARG ENABLE_WSS=false
 
 # ————— dépendances système minimales ————
 RUN apt-get update && \
@@ -30,6 +30,11 @@ RUN git clone --branch "${RUSTDESK_TAG}" \
 # ————— copie des sources JS ————————
 WORKDIR /src/rustdesk/flutter/web
 RUN if [ -d "v1" ]; then cp -a v1/* .; fi
+
+# --- juste avant WORKDIR /src/rustdesk/flutter/web/js (stage js-build) ------
+RUN sed -i '/chunkFileNames:/a\        manualChunks(id) {\
+          if (id.includes("node_modules")) return "vendor";\
+        },' /src/rustdesk/flutter/web/js/vite.config.js
 
 WORKDIR /src/rustdesk/flutter/web/js
 
@@ -106,12 +111,25 @@ RUN wget -qO /tmp/web_deps.tar.gz \
 RUN grep -rl 'DialogTheme(' lib/ | xargs sed -i 's/DialogTheme(/DialogThemeData(/g' && \
     grep -rl 'TabBarTheme('  lib/ | xargs sed -i 's/TabBarTheme(/TabBarThemeData(/g'
 
+# ─── build Flutter web (stage flutter-build) ────────────────────────────────
 ENV FLUTTER_ALLOW_ROOT=1
-# ————— build Flutter web (cache Cargo+Flutter) —
 RUN --mount=type=cache,target=/usr/local/cargo \
     --mount=type=cache,target=/root/.cache/flutter \
     . $HOME/.cargo/env && \
-    flutter build web --release
+    flutter build web --release && \
+    \
+    # place le bundle Vite
+    mkdir -p build/web/js && \
+    cp -r web/js/dist build/web/js/
+
+ARG ID_SERVER=""
+ENV ID_SERVER=${ID_SERVER}
+
+RUN if [ -n "$ID_SERVER" ]; then \
+      sed -i "s#rs-us.rustdesk.com#$ID_SERVER#g" build/web/js/index*.js && \
+      sed -i "s#rs-sg.rustdesk.com#$ID_SERVER#g" build/web/js/index*.js && \
+      sed -i "s#rs-cn.rustdesk.com#$ID_SERVER#g" build/web/js/index*.js ; \
+    fi
 
 ###############################################################################
 # Étape 3 — Runtime Nginx ultra-léger (adapté pour RustDesk Web v1)
@@ -148,7 +166,7 @@ server {
 
     # Proxy pour l’API RustDesk
     location /api/ {
-        proxy_pass http://api;
+        proxy_pass PROTO://api;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -156,7 +174,7 @@ server {
 
     # WebSocket pour l’ID server (port 21118) :contentReference[oaicite:0]{index=0}
     location /ws/id {
-        proxy_pass http://ws_id;
+        proxy_pass PROTO://ws_id;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -165,7 +183,7 @@ server {
 
     # WebSocket pour le relay server (port 21119) :contentReference[oaicite:1]{index=1}
     location /ws/relay {
-        proxy_pass http://ws_relay;
+        proxy_pass PROTO://ws_relay;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -187,8 +205,10 @@ COPY <<'EOF' /docker-entrypoint.sh
 set -e
 # par défaut on pointe vers localhost
 HOST="${BACKEND_HOST:-127.0.0.1}"
-# remplace dans la conf tous les upstreams
-sed -i "s/PLACEHOLDER_HOST/$HOST/g" /etc/nginx/conf.d/default.conf
+PROTO="${PROTO:-http}"
+sed -e "s#PLACEHOLDER_HOST#$HOST#g" \
+    -e "s#PROTO#$PROTO#g" \
+    /etc/nginx/conf.d/default.conf.tpl > /etc/nginx/conf.d/default.conf
 exec nginx -g 'daemon off;'
 EOF
 
