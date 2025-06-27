@@ -7,7 +7,7 @@ FROM node:20-slim AS js-build
 
 # ————— paramètres build ——————————————
 ARG RUSTDESK_REPO=MonsieurBiche/rustdesk-web-client
-ARG RUSTDESK_TAG=fix-build
+ARG RUSTDESK_TAG=add-features
 ARG ENABLE_WSS=true
 
 # ————— dépendances système minimales ————
@@ -35,6 +35,10 @@ RUN sed -i '/chunkFileNames:/a\        manualChunks(id) {\
           if (id.includes("node_modules")) return "vendor";\
         },' /src/rustdesk/flutter/web/js/vite.config.js
 
+# --- Fix appBarActions parameter (web build) ---
+RUN sed -i 's/ConnectionPage(key: _connKey);/ConnectionPage(key: _connKey, appBarActions: const <Widget>[]);/' \
+    /src/rustdesk/flutter/lib/mobile/pages/home_page.dart
+
 WORKDIR /src/rustdesk/flutter/web/js
 
 # ————— install Yarn + deps (cache BuildKit) —
@@ -47,6 +51,39 @@ RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
 RUN if [ "$ENABLE_WSS" = "true" ]; then \
       find . -name "*.ts" -o -name "*.js" | xargs sed -i 's#ws://#wss://#g'; \
     fi
+
+# --- RustDesk localStorage bootstrap & sanitization ---
+# --- Inline <script> in index.html : full localStorage sanitization ---
+RUN HTML=/src/rustdesk/flutter/web/index.html && \
+    sed -i '0,/<meta charset=.UTF-8./a \
+<script>\
+(function(){\
+  const defaults={\
+    "custom-rendezvous-server":"",\
+    "rendezvous-server":"",\
+    "id":"",\
+    "key":"",\
+    "remote-id":"",\
+    "peers":[],\
+    "server_config":{"customServers":[]}\
+  };\
+  /* Balaye TOUTES les clés */\
+  for(const k of Object.keys(localStorage)){\
+    let v=localStorage.getItem(k);\
+    if(v===null||v===""){localStorage.removeItem(k);continue;}\
+    /* Si valeur JSON potentielle */\
+    const f=v[0];\
+    if(f==="{"||f==="["){\
+      try{JSON.parse(v);}catch{localStorage.setItem(k,f==="["?"[]":"{}");}\
+    }\
+  }\
+  /* Injecte les valeurs par défaut manquantes */\
+  for(const [k,val] of Object.entries(defaults))\
+    if(localStorage.getItem(k)===null)\
+      localStorage.setItem(k,typeof val==="string"?val:JSON.stringify(val));\
+})();\
+</script>' "$HTML"
+
 
 # ————— build JS ————————————————
 RUN yarn build
