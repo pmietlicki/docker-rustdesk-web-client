@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script de build automatisé pour RustDesk Web Client
-# Version optimisée avec Flutter 3.19.6
+# Version optimisée avec Flutter 3.22.1
 
 set -e  # Arrêt en cas d'erreur
 
@@ -13,8 +13,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration flexible
-FLUTTER_VERSION="3.22.3"
-RUSTDESK_BRANCH="${RUSTDESK_BRANCH:-enable-wss}"  # fix-build, enable-wss, add-features
+FLUTTER_VERSION="3.22.1"
+RUSTDESK_TAG="${RUSTDESK_TAG:-fix-build}"  # fix-build, enable-wss, add-features
 RUSTDESK_REPO="${RUSTDESK_REPO:-MonsieurBiche/rustdesk-web-client}"
 ENABLE_WSS="${ENABLE_WSS:-true}"
 IMAGE_NAME="rustdesk-web-client"
@@ -88,7 +88,7 @@ cleanup() {
 build_image() {
     log_info "Démarrage du build Docker..."
     echo "🔧 Building RustDesk Web Client with Flutter $FLUTTER_VERSION..."
-    log_info "Repository: $RUSTDESK_REPO | Branch: $RUSTDESK_BRANCH | WSS: $ENABLE_WSS"
+    log_info "Repository: $RUSTDESK_REPO | Tag: $RUSTDESK_TAG | WSS: $ENABLE_WSS"
     
     # Activer BuildKit pour de meilleures performances
     export DOCKER_BUILDKIT=1
@@ -96,7 +96,7 @@ build_image() {
     # Build avec progress et cache
     docker build \
         --build-arg FLUTTER_VERSION="$FLUTTER_VERSION" \
-        --build-arg RUSTDESK_BRANCH="$RUSTDESK_BRANCH" \
+        --build-arg RUSTDESK_TAG="$RUSTDESK_TAG" \
         --build-arg RUSTDESK_REPO="$RUSTDESK_REPO" \
         --build-arg ENABLE_WSS="$ENABLE_WSS" \
         --progress=plain \
@@ -115,7 +115,7 @@ start_container() {
     
     docker run -d \
         --name "$CONTAINER_NAME" \
-        -p "$WEB_PORT:5000" \
+        -p "$WEB_PORT:80" \
         -p "$WS_PORT:21117" \
         --restart unless-stopped \
         "$IMAGE_NAME" || {

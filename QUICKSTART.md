@@ -1,8 +1,8 @@
 # 🚀 Guide de Démarrage Rapide - RustDesk Web Client
 
 ## 📋 Versions utilisées
-- **Flutter**: 3.22.3
-- **Branche**: enable-wss (par défaut)
+- **Flutter**: 3.22.1
+- **Tag**: fix-build (par défaut)
 - **Repository**: MonsieurBiche/rustdesk-web-client
 - **Support WSS**: Activé
 
@@ -37,15 +37,15 @@ docker-compose up --build -d
 ### Build manuel
 ```bash
 docker build -t rustdesk-web-client .
-docker run -d -p 5000:5000 -p 21117:21117 --name rustdesk-web rustdesk-web-client
+docker run -d -p 5000:80 -p 21117:21117 --name rustdesk-web rustdesk-web-client
 ```
 
 ## ⚙️ Configuration avancée
 
 ### Variables d'environnement
 ```bash
-# Personnaliser la branche
-export RUSTDESK_BRANCH=enable-wss
+# Personnaliser le tag
+export RUSTDESK_TAG=enable-wss
 
 # Changer le repository source
 export RUSTDESK_REPO=MonsieurBiche/rustdesk-web-client

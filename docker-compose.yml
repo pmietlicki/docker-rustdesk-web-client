@@ -6,19 +6,20 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        RUSTDESK_BRANCH: "enable-wss"  # Options: fix-build, enable-wss, add-features
+        RUSTDESK_TAG: "fix-build"  # Options: fix-build, enable-wss, add-features
         RUSTDESK_REPO: "MonsieurBiche/rustdesk-web-client"  # ou rustdesk/rustdesk
         ENABLE_WSS: "true"
+        FLUTTER_VERSION: "3.22.1"
     container_name: rustdesk-web-client
     ports:
-      - "5000:5000"
+      - "5000:80"
       - "21117:21117"
     environment:
       - RUSTDESK_WEB_PORT=5000
       - RUSTDESK_WS_PORT=21117
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      test: ["CMD", "curl", "-f", "http://localhost/"]
       interval: 30s
       timeout: 10s
       retries: 3

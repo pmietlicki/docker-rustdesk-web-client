@@ -1,195 +1,194 @@
-# RustDesk Web Client - Dockerfile basé sur MonsieurBiche/rustdesk-web-client
-# Version améliorée avec Debian Bullseye et configuration flexible
+# syntax=docker/dockerfile:1.7
 
-# ===== Stage 1: Base Environment =====
-FROM debian:bullseye-slim AS base
+###############################################################################
+# Étape 1 — Build JS/TS (RustDesk front)
+###############################################################################
+FROM node:20-slim AS js-build
 
-WORKDIR /
-ARG DEBIAN_FRONTEND=noninteractive
-RUN apt-get update -y && \
-    apt-get install --yes --no-install-recommends \
-        g++ \
-        gcc \
-        git \
-        curl \
-        nasm \
-        yasm \
-        libgtk-3-dev \
-        clang \
-        libxcb-randr0-dev \
-        libxdo-dev \
-        libxfixes-dev \
-        libxcb-shape0-dev \
-        libxcb-xfixes0-dev \
-        libasound2-dev \
-        libpam0g-dev \
-        libpulse-dev \
-        make \
-        cmake \
-        unzip \
-        zip \
-        sudo \
-        libgstreamer1.0-dev \
-        libgstreamer-plugins-base1.0-dev \
-        ca-certificates \
-        ninja-build && \
-        rm -rf /var/lib/apt/lists/*
-
-RUN git clone --branch 2023.04.15 --depth=1 https://github.com/microsoft/vcpkg && \
-    /vcpkg/bootstrap-vcpkg.sh -disableMetrics && \
-    /vcpkg/vcpkg --disable-metrics install libvpx libyuv opus aom
-
-# Create user for security (adapted for our constraints)
-RUN useradd -m -s /bin/bash user
-WORKDIR /home/user
-RUN curl -LO https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.lnx/x64/libsciter-gtk.so
-
-# Install Rust and configure environment for user
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup.sh && \
-    chmod +x rustup.sh && \
-    ./rustup.sh -y && \
-    mkdir -p /home/user/.cargo && \
-    cp -r /root/.cargo/* /home/user/.cargo/ && \
-    cp -r /root/.rustup   /home/user/.rustup && \
-    chown -R user:user /home/user/.cargo && \
-    chown -R user:user /home/user/.rustup && \
-    echo 'source /home/user/.cargo/env' >> /home/user/.bashrc
-
-ENV HOME=/home/user
-ENV PATH="/home/user/.cargo/bin:/root/.cargo/bin:$PATH"
-
-# ===== Stage 2: Build Environment =====
-FROM base AS build-env
-
-# Arguments de configuration flexible
-ARG FLUTTER_VERSION=3.22.1
-ARG RUSTDESK_BRANCH=enable-wss
+# ————— paramètres build ——————————————
 ARG RUSTDESK_REPO=MonsieurBiche/rustdesk-web-client
+ARG RUSTDESK_TAG=fix-build
 ARG ENABLE_WSS=true
 
-# Install dependencies using package manager (excluding cargo since we use rustup)
+# ————— dépendances système minimales ————
 RUN apt-get update && \
-    apt-get install -y build-essential pkg-config zip unzip wget curl git nasm && \
-    apt-get install -y cmake python3-clang libgtk-3-dev && \
-    apt-get install -y curl git wget unzip libgconf-2-4 gdb libstdc++6 libglu1-mesa fonts-droid-fallback lib32stdc++6 clang cmake ninja-build pkg-config libgtk-3-dev npm python3 protobuf-compiler && \
-    ln -s /usr/bin/python3 /usr/bin/python && \
-    apt-get clean
+    apt-get install -y --no-install-recommends \
+        git python3 python-is-python3 protobuf-compiler ca-certificates \
+        build-essential && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install vcpkg (version optimisée selon la nouvelle approche)
-ENV VCPKG_ROOT=/opt/vcpkg
-RUN wget -qO vcpkg.tar.gz https://github.com/microsoft/vcpkg/archive/master.tar.gz && \
-    mkdir $VCPKG_ROOT && \
-    tar xf vcpkg.tar.gz --strip-components=1 -C $VCPKG_ROOT && \
-    $VCPKG_ROOT/bootstrap-vcpkg.sh && \
-    ln -s $VCPKG_ROOT/vcpkg /usr/local/bin/vcpkg && \
-    rm -rf vcpkg.tar.gz
+WORKDIR /src
+# ————— clone reproductible ——————————————
+# ─── clone repo + sous-modules ────────────────────────────────────────────────
+RUN git clone --branch "${RUSTDESK_TAG}" \
+        --depth 1 \
+        --recursive --shallow-submodules \
+        "https://github.com/${RUSTDESK_REPO}.git" rustdesk \
+ && cd rustdesk \
+ && git submodule update --init --recursive --depth 1
 
-# Install dependencies using vcpkg
-RUN export VCPKG_ROOT=$VCPKG_ROOT && \
-    vcpkg install libvpx libyuv opus aom
+# ————— copie des sources JS ————————
+WORKDIR /src/rustdesk/flutter/web
+RUN if [ -d "v1" ]; then cp -a v1/* .; fi
 
-# Install Flutter with version flexible
-ARG FLUTTER_SDK=/usr/local/flutter
-RUN git clone https://github.com/flutter/flutter.git $FLUTTER_SDK && \
-    cd $FLUTTER_SDK && git fetch && git checkout $FLUTTER_VERSION
-RUN chown -R user:user ${FLUTTER_SDK} && \
-    git config --global --add safe.directory ${FLUTTER_SDK}
-ENV PATH="$FLUTTER_SDK/bin:$FLUTTER_SDK/bin/cache/dart-sdk/bin:${PATH}"
-RUN flutter doctor -v && \
+RUN sed -i '/chunkFileNames:/a\        manualChunks(id) {\
+          if (id.includes("node_modules")) return "vendor";\
+        },' /src/rustdesk/flutter/web/js/vite.config.js
+
+WORKDIR /src/rustdesk/flutter/web/js
+
+# ————— install Yarn + deps (cache BuildKit) —
+RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
+    corepack enable && \
+    corepack prepare "yarn@1.22.22" --activate && \
+    yarn install --non-interactive --silent;
+
+# ————— patch WSS éventuel —————————
+RUN if [ "$ENABLE_WSS" = "true" ]; then \
+      find . -name "*.ts" -o -name "*.js" | xargs sed -i 's#ws://#wss://#g'; \
+    fi
+
+# ————— build JS ————————————————
+RUN yarn build
+
+###############################################################################
+# Étape 2 — Build Flutter Web
+###############################################################################
+FROM debian:bookworm-slim AS flutter-build
+
+ARG FLUTTER_VERSION=3.22.1
+ENV FLUTTER_HOME=/opt/flutter
+ENV PATH="$FLUTTER_HOME/bin:$FLUTTER_HOME/bin/cache/dart-sdk/bin:$PATH"
+ENV RUSTFLAGS='--cfg getrandom_backend="js"'
+
+# ————— dépendances système ——————————
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        bash curl git xz-utils zip unzip ca-certificates \
+        build-essential clang cmake ninja-build pkg-config \
+        python3 python-is-python3 protobuf-compiler \
+        libgtk-3-dev libgl1-mesa-dev libglu1-mesa wget && \
+    rm -rf /var/lib/apt/lists/*
+
+# ————— Rust + target wasm (cache BuildKit) —
+RUN --mount=type=cache,target=/usr/local/cargo \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+    sh -s -- -y --no-modify-path && \
+    . $HOME/.cargo/env && \
+    rustup target add wasm32-unknown-unknown
+
+# ————— Flutter SDK (cache BuildKit) —————
+RUN --mount=type=cache,target=/root/.cache/flutter \
+    git clone --depth 1 --branch "${FLUTTER_VERSION}" \
+        https://github.com/flutter/flutter.git "$FLUTTER_HOME" && \
     flutter config --enable-web --no-analytics && \
     flutter precache --web
 
-# Prepare container
-ARG APP=/app
-RUN mkdir -p $APP
+# ————— copie sources depuis js-build ————
+COPY --from=js-build /src/rustdesk /build/rustdesk
+WORKDIR /build/rustdesk/flutter
 
-# Clone RustDesk repository with flexible configuration
-WORKDIR $APP
-RUN echo "Cloning RustDesk from $RUSTDESK_REPO with branch: $RUSTDESK_BRANCH" && \
-    git clone --depth=1 --branch "$RUSTDESK_BRANCH" \
-      https://github.com/$RUSTDESK_REPO.git rustdesk && \
-    echo "Successfully cloned $RUSTDESK_REPO ($RUSTDESK_BRANCH branch)" && \
-    ls -la $APP/rustdesk
+# 3) Dépendances web externes
+RUN wget -qO /tmp/web_deps.tar.gz \
+      https://github.com/pmietlicki/docker-rustdesk-web-client/raw/refs/heads/main/web_deps.tar.gz && \
+    tar -xzf /tmp/web_deps.tar.gz -C web/ && \
+    rm /tmp/web_deps.tar.gz
 
-# ===== Web JS Build =====
-WORKDIR $APP/rustdesk/flutter/web/js
+# ─── build Flutter web (stage flutter-build) ────────────────────────────────
+ENV FLUTTER_ALLOW_ROOT=1
+RUN --mount=type=cache,target=/usr/local/cargo \
+    --mount=type=cache,target=/root/.cache/flutter \
+    . $HOME/.cargo/env && \
+    flutter build web --release && \
+    \
+    # place le bundle Vite
+    mkdir -p build/web/js && \
+    cp -r web/js/dist build/web/js/
 
-# Files are now split into v1 and v2, v2 not public, need to copy to web folder to have correct paths in scripts
-RUN cp -R ../v1/* ../
+###############################################################################
+# Étape 3 — Runtime Nginx ultra-léger (adapté pour RustDesk Web v1)
+###############################################################################
+FROM nginx:alpine AS final
 
-# Add NodeSource PPA to install a newer version of Node.js
-RUN curl -sL https://deb.nodesource.com/setup_16.x | bash -
+# ————— assets statiques —————————————
+COPY --from=flutter-build /build/rustdesk/flutter/build/web /usr/share/nginx/html
 
-# Pin nodejs repo for stability
-RUN printf 'Package: nodejs\nPin: origin deb.nodesource.com\nPin-Priority: 600' > /etc/apt/preferences.d/nodesource
+RUN apk add --no-cache perl
 
-RUN apt-get install -y nodejs
+# ————— configuration Nginx ————————————
+# On utilise un placeholder HOST qu’on remplacera à l’entrée
+COPY <<'EOF' /etc/nginx/conf.d/default.conf
+upstream api {
+    server PLACEHOLDER_HOST:21114;
+}
+upstream ws_id {
+    server PLACEHOLDER_HOST:21118;
+}
+upstream ws_relay {
+    server PLACEHOLDER_HOST:21119;
+}
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+    index index.html;
 
-RUN npm install -g npm@9.8.1
+    # SPA fallback
+    location / {
+        try_files $uri $uri/ /index.html;
+        add_header X-Frame-Options "SAMEORIGIN";
+        add_header X-Content-Type-Options "nosniff";
+        add_header X-XSS-Protection "1; mode=block";
+    }
 
-# Install Node.js dependencies
-RUN npm install -g yarn typescript protoc --force && \
-    npm install ts-proto vite@2.8 yarn typescript protoc --force && \
-    npm install typescript@latest
+    # Proxy pour l’API RustDesk
+    location /api/ {
+        proxy_pass PROTO://api;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
 
-RUN yarn build
+    # WebSocket pour l’ID server (port 21118) :contentReference[oaicite:0]{index=0}
+    location /ws/id {
+        proxy_pass PROTO://ws_id;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+    }
 
-# ===== Web deps =====
-WORKDIR $APP/rustdesk/flutter/web
-RUN wget https://github.com/pmietlicki/docker-rustdesk-web-client/raw/refs/heads/main/web_deps.tar.gz && \
-    tar xzf web_deps.tar.gz
+    # WebSocket pour le relay server (port 21119) :contentReference[oaicite:1]{index=1}
+    location /ws/relay {
+        proxy_pass PROTO://ws_relay;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+    }
 
-# ===== Build Web app =====
-WORKDIR $APP/rustdesk/flutter
+    # cache long des assets
+    location ~* \.(js|css|wasm|png|jpg|jpeg|gif|svg|woff2?)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
+EOF
 
-# Vérification de l'environnement Flutter
-RUN echo "Checking Flutter environment..." && \
-    ls -la . && \
-    cat pubspec.yaml | head -20 && \
-    echo "pubspec.yaml found and readable"
+# ————— entrypoint dynamique ————————
+# Remplace PLACEHOLDER_HOST par la valeur de BACKEND_HOST (ou localhost par défaut)
+COPY <<'EOF' /docker-entrypoint.sh
+#!/bin/sh
+set -e
+# par défaut on pointe vers localhost
+HOST="${BACKEND_HOST:-127.0.0.1}"
+PROTO="${PROTO:-http}"
+sed -i "s/PLACEHOLDER_HOST/$HOST/g" /etc/nginx/conf.d/default.conf
+sed -i "s/PROTO/$PROTO/g" /etc/nginx/conf.d/default.conf
+exec nginx -g 'daemon off;'
+EOF
 
-# Nettoyage et réparation du cache avec gestion d'erreurs
-RUN flutter pub cache clean && \
-    flutter pub cache repair
+RUN chmod +x /docker-entrypoint.sh
 
-# Récupération des dépendances avec retry
-RUN flutter clean || true && \
-    flutter doctor -v && \
-    (flutter pub get --verbose || (echo "Première tentative échouée, retry..." && sleep 5 && flutter pub get --verbose)) && \
-    (flutter pub deps || echo "Warning: flutter pub deps failed but continuing...")
-
-# Switch to user context and build optimisé avec gestion d'erreurs
-RUN chown -R user:user /home/user /app /usr/local/flutter
-USER user
-RUN ./run.sh build web --release --verbose
-USER root
-
-# ===== Stage 3: Runtime Container =====
-FROM ubuntu:20.04 AS runtime
-
-# Install Python3 and dependencies
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && \
-    apt-get install -y python3 psmisc curl && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Copy necessary files from the build stage
-COPY --from=build-env /app/rustdesk/flutter/build/web /app/build/web
-
-# Copy server script from host
-COPY server/server.sh /app/server/server.sh
-RUN chmod +x /app/server/server.sh
-
-# Add health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/ || exit 1
-
-# Set environment variables for better logging
-ENV PYTHONUNBUFFERED=1
-ENV PORT=5000
-
-# Expose the port
-EXPOSE 5000
-WORKDIR /app/server
-ENTRYPOINT ["./server.sh"]
+EXPOSE 80
+HEALTHCHECK CMD wget -qO- http://localhost/ || exit 1
+ENTRYPOINT ["/docker-entrypoint.sh"]

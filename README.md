@@ -1,10 +1,10 @@
 # RustDesk Web Client - Version Optimisée
 
-Cette version optimisée du client web RustDesk résout les problèmes de build avec Flutter 3.24+ en utilisant Flutter 3.19.6 et intègre les améliorations du fork MonsieurBiche.
+Cette version optimisée du client web RustDesk résout les problèmes de build avec Flutter 3.24+ en utilisant Flutter 3.22.1 et intègre les améliorations du fork MonsieurBiche.
 
 ## 🚀 Fonctionnalités
 
-- ✅ **Flutter 3.22.3** - Version stable compatible (branch: fix-build)
+- ✅ **Flutter 3.22.1** - Version stable compatible (tag: fix-build)
 - ✅ **Configuration flexible** - Choix entre différentes branches et repositories
 - ✅ **Support WSS** - Configuration optionnelle pour connexions sécurisées
 - ✅ **Build optimisé** - Cache et dépendances améliorés
@@ -25,9 +25,9 @@ Cette version optimisée du client web RustDesk résout les problèmes de build 
 
 ### Choix de la branche
 
-Ce build supporte plusieurs branches du fork MonsieurBiche :
+Ce build supporte plusieurs tags du fork MonsieurBiche :
 
-| Branche | Description | Usage |
+| Tag | Description | Usage |
 |---------|-------------|-------|
 | `fix-build` | Corrections de build uniquement | Développement stable |
 | `enable-wss` | Support WSS pour HTTPS | **Production recommandée** |
@@ -36,8 +36,8 @@ Ce build supporte plusieurs branches du fork MonsieurBiche :
 ### Variables d'environnement
 
 ```bash
-# Branche à utiliser
-export RUSTDESK_BRANCH=enable-wss
+# Tag à utiliser
+export RUSTDESK_TAG=enable-wss
 
 # Repository source
 export RUSTDESK_REPO=MonsieurBiche/rustdesk-web-client
@@ -73,10 +73,10 @@ open http://localhost:5000
 ./build.sh build
 
 # Build avec support WSS (recommandé pour production)
-export RUSTDESK_BRANCH=enable-wss && export ENABLE_WSS=true && ./build.sh build
+export RUSTDESK_TAG=enable-wss && export ENABLE_WSS=true && ./build.sh build
 
 # Build avec toutes les fonctionnalités
-export RUSTDESK_BRANCH=add-features && ./build.sh build
+export RUSTDESK_TAG=add-features && ./build.sh build
 
 # Build avec nettoyage
 ./build.sh clean build
@@ -94,7 +94,7 @@ docker build -t rustdesk-web-client .
 # Démarrage du conteneur
 docker run -d \
   --name rustdesk-web \
-  -p 5000:5000 \
+  -p 5000:80 \
   -p 21117:21117 \
   rustdesk-web-client
 
@@ -112,8 +112,8 @@ RUSTDESK_WEB_PORT=5000      # Port du serveur web
 RUSTDESK_WS_PORT=21117      # Port WebSocket
 
 # Build (dans docker-compose.yml)
-FLUTTER_VERSION=3.22.3      # Version Flutter
-RUSTDESK_TAG=1.4.0          # Tag RustDesk
+FLUTTER_VERSION=3.22.1      # Version Flutter
+RUSTDESK_TAG=fix-build      # Tag RustDesk
 ```
 
 ### Personnalisation des ports
@@ -221,7 +221,7 @@ docker-compose build --parallel
 
 | Fonctionnalité | Original | Cette version |
 |---|---|---|
-| Flutter | 3.24.3 ❌ | 3.22.3 ✅ |
+| Flutter | 3.24.3 ❌ | 3.22.1 ✅ |
 | Serveur | Python http.server | Nginx ✅ |
 | WebSocket | Non configuré | Prêt ✅ |
 | Health checks | Non | Oui ✅ |
@@ -232,7 +232,7 @@ docker-compose build --parallel
 
 - [RustDesk Official](https://github.com/rustdesk/rustdesk)
 - [MonsieurBiche Fork](https://github.com/MonsieurBiche/rustdesk-web-client)
-- [Flutter 3.19.6 Docs](https://docs.flutter.dev/)
+- [Flutter 3.22.1 Docs](https://docs.flutter.dev/)
 - [RustDesk Web V2](https://rustdesk.com/web)
 
 ## 🤝 Contribution

@@ -139,6 +139,44 @@ FROM nginx:alpine AS final
 # ————— assets statiques —————————————
 COPY --from=flutter-build /build/rustdesk/flutter/build/web /usr/share/nginx/html
 
+# ###############################################################################
+# # Patch PROTO / ID_SERVER / y3()  —  étape « final »
+# ###############################################################################
+# ARG ID_SERVER="https://rs-us.rustdesk.com/ws/id"   # ← une barre / de moins !
+# ARG PROTO="https"
+
+# RUN <<BASH
+# set -eux
+# js_dir="/usr/share/nginx/html/js"
+
+# # ---------------------------------------------------------------------------
+# # CAS A : ID_SERVER **défini**  →  on **remplace uniquement y3()**
+# # ---------------------------------------------------------------------------
+# if [ -n "$ID_SERVER" ]; then
+#   find "$js_dir" -type f -name '*.js' \
+#     -exec perl -0777 -pi -e "s#function\\s+y3\\s*\\([^)]*\\)\\s*\\{[^}]*\\}#function y3(secure=!1){return '$ID_SERVER';}#smg" {} +
+#   echo "✔ y3() forcée → $ID_SERVER"
+#   exit 0
+# fi
+
+# # ---------------------------------------------------------------------------
+# # CAS B : ID_SERVER vide  →  serveurs publics
+# #         • Pi = \"<PROTO>://\"
+# #         • E4() ré-écrite (chemin /ws/id | /ws/relay, plus de :21118)
+# # ---------------------------------------------------------------------------
+
+# # 1)  Pi
+# find "$js_dir" -type f -name '*.js' \
+#   -exec sed -i -E "s#const[[:space:]]+Pi=\"[a-z]+://\"#const Pi=\"${PROTO}://\"#g" {} +
+
+# # 2)  E4()
+# replacement='function E4(u,secure=false){if(/^(wss?|https?):\\/\\//.test(u)){if(!/\\/ws\\/(id|relay)$/.test(u))u=u.replace(/\\/+$/,\"\")+ (secure?\"/ws/relay\":\"/ws/id\");return u;}const path=secure?\"/ws/relay\":\"/ws/id\";return \"'"${PROTO}"'://\"+u+path;}'
+# find "$js_dir" -type f -name '*.js' \
+#   -exec perl -0777 -pi -e "s#function\\s+E4\\s*\\([^)]*\\)\\s*\\{[^}]*\\}#${replacement}#smg" {} +
+
+# echo "✔ Pi & E4() patchés → PROTO=${PROTO}  (serveurs publics)"
+# BASH
+
 # ————— configuration Nginx ————————————
 # On utilise un placeholder HOST qu’on remplacera à l’entrée
 COPY <<'EOF' /etc/nginx/conf.d/default.conf
@@ -206,9 +244,9 @@ set -e
 # par défaut on pointe vers localhost
 HOST="${BACKEND_HOST:-127.0.0.1}"
 PROTO="${PROTO:-http}"
-sed -e "s#PLACEHOLDER_HOST#$HOST#g" \
-    -e "s#PROTO#$PROTO#g" \
-    /etc/nginx/conf.d/default.conf.tpl > /etc/nginx/conf.d/default.conf
+# remplace dans la conf tous les upstreams
+sed -i "s/PLACEHOLDER_HOST/$HOST/g" /etc/nginx/conf.d/default.conf
+sed -i "s/PROTO/$PROTO/g" /etc/nginx/conf.d/default.conf
 exec nginx -g 'daemon off;'
 EOF
 
