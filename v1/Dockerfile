@@ -16,9 +16,8 @@ RUN flutter doctor -v
 RUN flutter config --enable-web
 
 # Clone rustdesk repo and switch branch
-RUN git clone https://github.com/JelleBuning/rustdesk.git /app/rustdesk
+RUN git clone https://github.com/pmietlicki/rustdesk-web-client.git /app/rustdesk
 WORKDIR /app/rustdesk
-RUN git switch fix_build
 WORKDIR /app/rustdesk/flutter/web/js
 
 # Add NodeSource PPA to install a newer version of Node.js
