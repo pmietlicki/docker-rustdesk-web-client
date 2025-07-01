@@ -36,6 +36,7 @@ docker run -d \
   -e CUSTOM_RENDEZVOUS_SERVER="your-server.com:21116" \
   -e RELAY_SERVER="your-relay-server.com:21117" \
   -e KEY="your-public-key" \
+  -e API_SERVER="your-api-server.com" \
   pmietlicki/docker-rustdesk-web-client:v1
 ```
 
@@ -47,6 +48,7 @@ docker run -d \
   -e CUSTOM_RENDEZVOUS_SERVER="prod-server.yourcompany.com:21116" \
   -e RELAY_SERVER="relay.yourcompany.com:21117" \
   -e KEY="AAAAB3NzaC1yc2EAAAADAQABAAABgQC..." \
+  -e API_SERVER="api.yourcompany.com" \
   pmietlicki/docker-rustdesk-web-client:v1
 ```
 
@@ -57,6 +59,7 @@ docker run -d \
 | `CUSTOM_RENDEZVOUS_SERVER` | Your RustDesk server address:port | `my-server.com:21116` |
 | `RELAY_SERVER` | Relay server address:port | `relay.example.com:21117` |
 | `KEY` | Public key for encryption | `AAAAB3NzaC1yc2E...` |
+| `API_SERVER` | API server address | `api.example.com` |
 
 ### Docker Compose (v1.1.10)
 
@@ -72,6 +75,7 @@ services:
       - CUSTOM_RENDEZVOUS_SERVER=your-server.com:21116
       - RELAY_SERVER=your-relay.com:21117
       - KEY=your-public-key
+      - API_SERVER=your-api-server.com
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000"]
@@ -94,6 +98,7 @@ services:
       - CUSTOM_RENDEZVOUS_SERVER=votre-serveur.com
       - RELAY_SERVER=votre-serveur.com
       - KEY=votre-clé-publique
+      - API_SERVER=votre-api-serveur.com
     restart: unless-stopped
 ```
 
@@ -390,7 +395,7 @@ docker-compose up --build -d
 docker logs rustdesk-web
 
 # Verify environment variables
-docker exec rustdesk-web env | grep -E "CUSTOM_RENDEZVOUS_SERVER|RELAY_SERVER|KEY"
+docker exec rustdesk-web env | grep -E "CUSTOM_RENDEZVOUS_SERVER|RELAY_SERVER|KEY|API_SERVER"
 
 # Test connectivity
 curl -f http://localhost:5000
@@ -452,6 +457,7 @@ docker run -d \
   -e CUSTOM_RENDEZVOUS_SERVER="votre-serveur.com:21116" \
   -e RELAY_SERVER="votre-relay-serveur.com:21117" \
   -e KEY="votre-clé-publique" \
+  -e API_SERVER="votre-api-serveur.com" \
   pmietlicki/docker-rustdesk-web-client:v1
 ```
 
@@ -463,6 +469,7 @@ docker run -d \
   -e CUSTOM_RENDEZVOUS_SERVER="prod-serveur.votreentreprise.com:21116" \
   -e RELAY_SERVER="relay.votreentreprise.com:21117" \
   -e KEY="AAAAB3NzaC1yc2EAAAADAQABAAABgQC..." \
+  -e API_SERVER="api.votreentreprise.com" \
   pmietlicki/docker-rustdesk-web-client:v1
 ```
 
@@ -473,6 +480,7 @@ docker run -d \
 | `CUSTOM_RENDEZVOUS_SERVER` | Adresse:port de votre serveur RustDesk | `mon-serveur.com:21116` |
 | `RELAY_SERVER` | Adresse:port du serveur relay | `relay.exemple.com:21117` |
 | `KEY` | Clé publique pour le chiffrement | `AAAAB3NzaC1yc2E...` |
+| `API_SERVER` | Adresse du serveur API | `api.exemple.com` |
 
 ---
 
