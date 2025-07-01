@@ -1,15 +1,21 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Set the port
 PORT=5000
+echo "preparing port $PORT…"
+fuser -k $PORT/tcp
 
-# Stop any program currently running on the set port
-echo 'preparing port' $PORT '...'
-fuser -k 5000/tcp
-
-# Switch directory
 cd /app/build/web/
 
-# Start the server
-echo 'Server starting on port' $PORT '...'
+cat > env-config.js <<EOF
+// ce script est exécuté avant le main.js de ton app
+window.localStorage.setItem("custom-rendezvous-server", "${CUSTOM_RENDEZVOUS_SERVER:-}");
+window.localStorage.setItem("relay-server",              "${RELAY_SERVER:-}");
+window.localStorage.setItem("key",                       "${KEY:-}");
+EOF
+
+if ! grep -q "env-config.js" index.html; then
+  sed -i 's|</head>|  <script src="env-config.js"></script>\n</head>|' index.html
+fi
+
+echo "Server starting on port $PORT…"
 python3 -m http.server $PORT
