@@ -1,6 +1,6 @@
 # --- Step 1: Build the Flutter application ---
 
-FROM ubuntu:20.04@sha256:8feb4d8ca5354def3d8fce243717141ce31e2c428701f6682bd2fafe15388214 AS build
+FROM ubuntu:26.04@sha256:b7f48194d4d8b763a478a621cdc81c27be222ba2206ca3ca6bc42b49685f3d9e AS build
 
 ARG RUSTDESK_COMMIT=f5a090c27d529a17ccfaf984c061fbf71bffd841
 
