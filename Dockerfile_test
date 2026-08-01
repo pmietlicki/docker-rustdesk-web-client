@@ -6,7 +6,7 @@
 ###############################################################################
 # Étape 1 — Build JS/TS (RustDesk front)
 ###############################################################################
-FROM node:20-slim AS js-build
+FROM node:25-slim AS js-build
 
 # ————— paramètres build ——————————————
 ARG RUSTDESK_REPO=rustdesk/rustdesk
