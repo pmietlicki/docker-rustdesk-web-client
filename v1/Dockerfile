@@ -53,7 +53,7 @@ RUN flutter build web --release
 
 # --- Step 2: Server Configuration ---
 
-FROM python:3.12-slim-bookworm@sha256:8a7e7cc04fd3e2bd787f7f24e22d5d119aa590d429b50c95dfe12b3abe52f48b AS runtime
+FROM python:3.15-slim-bookworm@sha256:4e03260adeeebafccd084f3584e6b84823aba5651cfb53ef8a078ed441ddf9cd AS runtime
 
 # Copy necessary files from the build stage
 COPY --from=build /app/rustdesk/flutter/build/web /app/build/web
